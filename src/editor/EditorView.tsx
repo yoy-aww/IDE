@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import Editor, { type OnChange, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import { loader } from '@monaco-editor/react'
+import { registerCppCompletions } from './completions'
 
 // 使用本地安装的 monaco-editor 包，不依赖 CDN
 // 解决少儿教室离线场景下 Monaco 字体/资源加载失败的问题
@@ -44,6 +45,9 @@ export function EditorView({
   const handleMount: OnMount = (editor, monacoNs) => {
     editorRef.current = editor
     monacoRef.current = monacoNs
+
+    // 注册 C++ 代码补全
+    registerCppCompletions()
 
     // 断点：点击行号左侧 gutter 切换
     editor.onMouseDown((e) => {
