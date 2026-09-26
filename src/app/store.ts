@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface Variable {
   name: string
@@ -57,6 +58,11 @@ interface IDEStore {
   breakpoints: number[]
   toggleBreakpoint: (line: number) => void
 
+  // 光标位置
+  cursorLine: number
+  cursorCol: number
+  setCursor: (line: number, col: number) => void
+
   // 调试状态（Phase 3+ 实现）
   debugState: DebugState | null
   setDebugState: (state: DebugState) => void
@@ -75,32 +81,49 @@ int main() {
     return 0;
 }`
 
-export const useIDEStore = create<IDEStore>((set) => ({
-  code: DEFAULT_CODE,
-  setCode: (code) => set({ code }),
+export const useIDEStore = create<IDEStore>()(
+  persist(
+    (set) => ({
+      code: DEFAULT_CODE,
+      setCode: (code) => set({ code }),
 
-  stdin: '',
-  setStdin: (stdin) => set({ stdin }),
+      stdin: '',
+      setStdin: (stdin) => set({ stdin }),
 
-  status: 'idle',
-  setStatus: (status) => set({ status }),
+      status: 'idle',
+      setStatus: (status) => set({ status }),
 
-  result: null,
-  setResult: (result) => set({ result }),
+      result: null,
+      setResult: (result) => set({ result }),
 
-  clearResult: () => set({ result: null, status: 'idle' }),
+      clearResult: () => set({ result: null, status: 'idle' }),
 
-  breakpoints: [],
-  toggleBreakpoint: (line) =>
-    set((state) => ({
-      breakpoints: state.breakpoints.includes(line)
-        ? state.breakpoints.filter((l) => l !== line)
-        : [...state.breakpoints, line].sort((a, b) => a - b),
-    })),
+      breakpoints: [],
+      toggleBreakpoint: (line) =>
+        set((state) => ({
+          breakpoints: state.breakpoints.includes(line)
+            ? state.breakpoints.filter((l) => l !== line)
+            : [...state.breakpoints, line].sort((a, b) => a - b),
+        })),
 
-  debugState: null,
-  setDebugState: (state) => set({ debugState: state }),
+      cursorLine: 1,
+      cursorCol: 1,
+      setCursor: (line, col) => set({ cursorLine: line, cursorCol: col }),
 
-  debugMode: 'idle',
-  setDebugMode: (mode) => set({ debugMode: mode }),
-}))
+      debugState: null,
+      setDebugState: (state) => set({ debugState: state }),
+
+      debugMode: 'idle',
+      setDebugMode: (mode) => set({ debugMode: mode }),
+    }),
+    {
+      name: 'kids-ide-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        code: state.code,
+        stdin: state.stdin,
+        breakpoints: state.breakpoints,
+      }),
+    }
+  )
+)

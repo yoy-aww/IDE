@@ -1,6 +1,11 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import Editor, { type OnChange, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
+import { loader } from '@monaco-editor/react'
+
+// 使用本地安装的 monaco-editor 包，不依赖 CDN
+// 解决少儿教室离线场景下 Monaco 字体/资源加载失败的问题
+loader.config({ monaco })
 
 interface EditorViewProps {
   value: string
@@ -10,6 +15,8 @@ interface EditorViewProps {
   breakpoints?: number[]
   onToggleBreakpoint?: (line: number) => void
   currentDebugLine?: number
+  onCursorChange?: (line: number, col: number) => void
+  onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
 }
 
 export function EditorView({
@@ -20,18 +27,25 @@ export function EditorView({
   breakpoints = [],
   onToggleBreakpoint,
   currentDebugLine,
+  onCursorChange,
+  onEditorMount,
 }: EditorViewProps) {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const decorationsRef = useRef<monaco.editor.IEditorDecorationsCollection | null>(null)
   const monacoRef = useRef<typeof monaco | null>(null)
   const toggleBreakpointRef = useRef(onToggleBreakpoint)
+  const cursorChangeRef = useRef(onCursorChange)
+  const editorMountRef = useRef(onEditorMount)
+
   toggleBreakpointRef.current = onToggleBreakpoint
+  cursorChangeRef.current = onCursorChange
+  editorMountRef.current = onEditorMount
 
   const handleMount: OnMount = (editor, monacoNs) => {
     editorRef.current = editor
     monacoRef.current = monacoNs
 
-    // Toggle breakpoint on glyph margin click
+    // 断点：点击行号左侧 gutter 切换
     editor.onMouseDown((e) => {
       if (
         e.target &&
@@ -42,13 +56,21 @@ export function EditorView({
         toggleBreakpointRef.current(e.target.position.lineNumber)
       }
     })
+
+    // 光标位置变化
+    editor.onDidChangeCursorPosition((e) => {
+      cursorChangeRef.current?.(e.position.lineNumber, e.position.column)
+    })
+
+    // 通知外部编辑器已就绪
+    editorMountRef.current?.(editor)
   }
 
   const handleChange: OnChange = (val) => {
     onChange(val ?? '')
   }
 
-  // Update decorations when breakpoints/error/debug line changes
+  // 更新装饰（断点、错误行、调试行）
   useEffect(() => {
     const editor = editorRef.current
     const monacoNs = monacoRef.current
@@ -56,7 +78,7 @@ export function EditorView({
 
     const deltas: monaco.editor.IModelDeltaDecoration[] = []
 
-    // Breakpoints
+    // 断点标记
     breakpoints.forEach((line) => {
       deltas.push({
         range: new monacoNs.Range(line, 1, line, 1),
@@ -68,7 +90,7 @@ export function EditorView({
       })
     })
 
-    // Current debug line
+    // 调试当前行
     if (currentDebugLine) {
       deltas.push({
         range: new monacoNs.Range(currentDebugLine, 1, currentDebugLine, 1),
@@ -81,7 +103,7 @@ export function EditorView({
       })
     }
 
-    // Error line
+    // 错误行高亮
     if (errorLine) {
       const endCol = errorCol || Infinity
       deltas.push({
@@ -100,7 +122,7 @@ export function EditorView({
     }
     decorationsRef.current.set(deltas)
 
-    // Reveal error line
+    // 自动滚动到错误行
     if (errorLine) {
       editor.revealLineInCenter(errorLine)
     }
@@ -114,7 +136,11 @@ export function EditorView({
       onChange={handleChange}
       onMount={handleMount}
       options={EDITOR_OPTIONS}
-      loading={<div className="flex items-center justify-center h-full text-gray-400">编辑器加载中...</div>}
+      loading={
+        <div className="flex items-center justify-center h-full text-gray-400">
+          编辑器加载中...
+        </div>
+      }
     />
   )
 }
