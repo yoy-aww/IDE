@@ -151,11 +151,12 @@ function App() {
   const {
     code,
     setCode,
+    stdin,
+    setStdin,
     status,
     breakpoints,
     toggleBreakpoint,
     result,
-    debugMode,
     debugState,
   } = useIDEStore()
 
@@ -163,28 +164,17 @@ function App() {
     ideController.run()
   }
 
-  const handleDebug = () => {
-    ideController.debugRun()
-  }
-
-  const handleStep = () => {
-    ideController.debugStep('next')
-  }
-
-  const handleContinue = () => {
-    ideController.debugContinue()
-  }
-
   const handleInterrupt = () => {
-    ideController.debugInterrupt()
+    ideController.interrupt()
   }
 
   const loadSample = (sample: { code: string }) => {
     setCode(sample.code)
+    setStdin('')
   }
 
-  const isRunning = status === 'running' || status === 'debugging'
-  const isPaused = debugMode === 'paused'
+  const isRunning = status === 'running'
+  const isPaused = false // Phase 3+ 实现
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
@@ -203,10 +193,6 @@ function App() {
                 ? 'bg-gray-600 text-gray-300'
                 : status === 'running'
                 ? 'bg-yellow-600 text-yellow-100'
-                : status === 'debugging'
-                ? 'bg-blue-600 text-blue-100'
-                : status === 'paused'
-                ? 'bg-purple-600 text-purple-100'
                 : status === 'error'
                 ? 'bg-red-600 text-red-100'
                 : status === 'timeout'
@@ -216,8 +202,6 @@ function App() {
           >
             {status === 'idle' && '就绪'}
             {status === 'running' && '运行中'}
-            {status === 'debugging' && '调试中'}
-            {status === 'paused' && '已暂停'}
             {status === 'error' && '错误'}
             {status === 'timeout' && '超时'}
           </span>
@@ -232,40 +216,10 @@ function App() {
             <span>运行</span>
           </button>
 
-          {/* Debug button */}
-          <button
-            onClick={handleDebug}
-            disabled={isRunning && !isPaused}
-            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-          >
-            <span>🐛</span>
-            <span>调试</span>
-          </button>
-
-          {/* Step button */}
-          <button
-            onClick={handleStep}
-            disabled={!isPaused}
-            className="flex items-center gap-1 px-3 py-1.5 bg-gray-600 hover:bg-gray-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-          >
-            <span>⏭</span>
-            <span>步进</span>
-          </button>
-
-          {/* Continue button */}
-          <button
-            onClick={handleContinue}
-            disabled={!isPaused}
-            className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-          >
-            <span>▶</span>
-            <span>继续</span>
-          </button>
-
           {/* Interrupt button */}
           <button
             onClick={handleInterrupt}
-            disabled={!isRunning && !isPaused}
+            disabled={!isRunning}
             className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
           >
             <span>⏹</span>
@@ -293,7 +247,7 @@ function App() {
           </div>
         </div>
 
-        {/* Side panel: Samples + Debug Info */}
+        {/* Side panel: Samples + Breakpoints */}
         <div className="w-64 border-l border-gray-700 bg-gray-850 overflow-auto flex flex-col">
           {/* Samples */}
           <div className="p-3 border-b border-gray-700">
@@ -358,9 +312,24 @@ function App() {
         </div>
       </div>
 
-      {/* Terminal */}
-      <div className="h-40 border-t border-gray-700 bg-gray-900">
-        <Terminal />
+      {/* Terminal with stdin support */}
+      <div className="h-40 border-t border-gray-700 bg-gray-900 flex flex-col">
+        {/* Stdin input */}
+        {stdin !== '' && (
+          <div className="flex items-start gap-2 px-3 py-1 bg-gray-800 border-b border-gray-700">
+            <span className="text-xs text-gray-400 mt-1 shrink-0">stdin:</span>
+            <input
+              type="text"
+              value={stdin}
+              onChange={(e) => setStdin(e.target.value)}
+              placeholder="输入用户输入，多个值用空格分隔"
+              className="flex-1 bg-transparent text-xs text-gray-200 outline-none"
+            />
+          </div>
+        )}
+        <div className="flex-1 overflow-auto">
+          <Terminal />
+        </div>
       </div>
     </div>
   )

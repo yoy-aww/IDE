@@ -36,29 +36,36 @@ export interface DebugState {
 export type RunStatus = 'idle' | 'running' | 'debugging' | 'paused' | 'error' | 'timeout'
 
 interface IDEStore {
+  // 代码编辑
   code: string
   setCode: (code: string) => void
 
+  // 输入 (stdin)
+  stdin: string
+  setStdin: (stdin: string) => void
+
+  // 运行状态
   status: RunStatus
   setStatus: (status: RunStatus) => void
 
   result: RunResult | null
   setResult: (result: RunResult) => void
 
-  debugState: DebugState | null
-  setDebugState: (state: DebugState) => void
+  clearResult: () => void
 
+  // 断点
   breakpoints: number[]
   toggleBreakpoint: (line: number) => void
 
+  // 调试状态（Phase 3+ 实现）
+  debugState: DebugState | null
+  setDebugState: (state: DebugState) => void
+
   debugMode: 'idle' | 'running' | 'paused'
   setDebugMode: (mode: 'idle' | 'running' | 'paused') => void
-
-  clearResult: () => void
 }
 
-export const useIDEStore = create<IDEStore>((set) => ({
-  code: `#include <iostream>
+const DEFAULT_CODE = `#include <iostream>
 using namespace std;
 
 int main() {
@@ -66,9 +73,14 @@ int main() {
     int b = 20;
     cout << a + b;
     return 0;
-}`,
+}`
 
+export const useIDEStore = create<IDEStore>((set) => ({
+  code: DEFAULT_CODE,
   setCode: (code) => set({ code }),
+
+  stdin: '',
+  setStdin: (stdin) => set({ stdin }),
 
   status: 'idle',
   setStatus: (status) => set({ status }),
@@ -76,8 +88,7 @@ int main() {
   result: null,
   setResult: (result) => set({ result }),
 
-  debugState: null,
-  setDebugState: (state) => set({ debugState: state }),
+  clearResult: () => set({ result: null, status: 'idle' }),
 
   breakpoints: [],
   toggleBreakpoint: (line) =>
@@ -87,8 +98,9 @@ int main() {
         : [...state.breakpoints, line].sort((a, b) => a - b),
     })),
 
+  debugState: null,
+  setDebugState: (state) => set({ debugState: state }),
+
   debugMode: 'idle',
   setDebugMode: (mode) => set({ debugMode: mode }),
-
-  clearResult: () => set({ result: null, status: 'idle' }),
 }))

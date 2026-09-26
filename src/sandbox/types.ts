@@ -1,12 +1,14 @@
+// Worker 通信协议
+// 前端 → Worker
 export interface WorkerRequest {
-  type: 'run' | 'debug_start' | 'debug_step' | 'debug_continue' | 'debug_interrupt'
-  code?: string
-  breakpoints?: number[]
-  stepMode?: 'next' | 'over' | 'into' | 'out'
+  type: 'run'
+  code: string
+  stdin: string
 }
 
+// Worker → 前端
 export interface WorkerResult {
-  type: 'result' | 'debug_state' | 'debug_break' | 'timeout' | 'error'
+  type: 'result' | 'timeout' | 'error'
   stdout?: string
   stderr?: string
   exitCode?: number
@@ -14,10 +16,9 @@ export interface WorkerResult {
   errorCol?: number
   errorMessage?: string
   duration?: number
-  currentLine?: number
-  variables?: Array<{ name: string; value: unknown; type: string; line: number }>
-  callStack?: Array<{ functionName: string; line: number; variables: unknown[] }>
-  paused?: boolean
-  atBreakpoint?: boolean
-  message?: string
+}
+
+// 运行配置
+export interface RunConfig {
+  timeout?: number
 }
