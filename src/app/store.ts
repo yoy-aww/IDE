@@ -65,7 +65,7 @@ interface IDEStore {
 
   // 调试状态（Phase 3+ 实现）
   debugState: DebugState | null
-  setDebugState: (state: DebugState) => void
+  setDebugState: (state: DebugState | null) => void
 
   debugMode: 'idle' | 'running' | 'paused'
   setDebugMode: (mode: 'idle' | 'running' | 'paused') => void
@@ -111,10 +111,10 @@ export const useIDEStore = create<IDEStore>()(
       setCursor: (line, col) => set({ cursorLine: line, cursorCol: col }),
 
       debugState: null,
-      setDebugState: (state) => set({ debugState: state }),
+      setDebugState: (state: DebugState | null) => set({ debugState: state }),
 
       debugMode: 'idle',
-      setDebugMode: (mode) => set({ debugMode: mode }),
+      setDebugMode: (mode: 'idle' | 'running' | 'paused') => set({ debugMode: mode }),
     }),
     {
       name: 'kids-ide-storage',

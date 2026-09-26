@@ -328,6 +328,7 @@ function App() {
     toggleBreakpoint,
     result,
     debugState,
+    debugMode,
     setCursor,
     clearResult,
   } = useIDEStore()
@@ -354,16 +355,49 @@ function App() {
   // 全局键盘快捷键
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // F5: 启动调试 / 继续
+      if (e.key === 'F5') {
+        e.preventDefault()
+        const store = useIDEStore.getState()
+        if (store.debugMode === 'idle') {
+          ideController.debugStart()
+        } else if (store.debugMode === 'paused') {
+          ideController.debugContinue()
+        }
+        return
+      }
+      // F9: 继续到下一个断点
+      if (e.key === 'F9') {
+        e.preventDefault()
+        const store = useIDEStore.getState()
+        if (store.debugMode === 'paused') {
+          ideController.debugContinue()
+        }
+        return
+      }
+      // F10: 单步执行
+      if (e.key === 'F10') {
+        e.preventDefault()
+        const store = useIDEStore.getState()
+        if (store.debugMode === 'paused') {
+          ideController.debugStep('next')
+        }
+        return
+      }
       // Ctrl+Enter: 运行
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault()
-        if (!sandboxIsRunning()) {
+        if (useIDEStore.getState().status !== 'running' && useIDEStore.getState().debugMode === 'idle') {
           ideController.run()
         }
       }
-      // Ctrl+C: 终止 (仅当正在运行)
+      // Ctrl+C: 终止
       if (e.ctrlKey && e.key === 'c') {
-        if (sandboxIsRunning()) {
+        const store = useIDEStore.getState()
+        if (store.debugMode !== 'idle') {
+          e.preventDefault()
+          ideController.debugStop()
+        } else if (store.status === 'running') {
           e.preventDefault()
           ideController.interrupt()
         }
@@ -374,6 +408,11 @@ function App() {
   }, [])
 
   const isRunning = status === 'running'
+  const isDebugging = debugMode !== 'idle'
+
+  const handleDebugStart = () => {
+    ideController.debugStart()
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
@@ -385,37 +424,87 @@ function App() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Run button */}
-          <button
-            onClick={handleRun}
-            disabled={isRunning}
-            className="flex items-center gap-1 px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-            title="Ctrl+Enter"
-          >
-            <span>▶</span>
-            <span>运行</span>
-          </button>
+          {/* Debug toolbar — visible when debugging */}
+          {isDebugging && (
+            <>
+              <button
+                onClick={() => ideController.debugContinue()}
+                disabled={!debugState?.paused}
+                className="flex items-center gap-1 px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                title="F9: 继续到下一个断点"
+              >
+                <span>▶</span>
+                <span>继续</span>
+              </button>
 
-          {/* Interrupt button */}
-          <button
-            onClick={handleInterrupt}
-            disabled={!isRunning}
-            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
-            title="Ctrl+C (运行时)"
-          >
-            <span>⏹</span>
-            <span>终止</span>
-          </button>
+              <button
+                onClick={() => ideController.debugStep('next')}
+                disabled={!debugState?.paused}
+                className="flex items-center gap-1 px-3 py-1.5 bg-yellow-700 hover:bg-yellow-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                title="F10: 下一步 (不进入函数)"
+              >
+                <span>⏭</span>
+                <span>步进</span>
+              </button>
 
-          {/* Clear output button */}
-          {result && (
-            <button
-              onClick={handleClearOutput}
-              className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
-              title="清除输出"
-            >
-              <span>🗑</span>
-            </button>
+              <button
+                onClick={() => ideController.debugStop()}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-sm rounded transition-colors"
+                title="停止调试"
+              >
+                <span>⏹</span>
+                <span>停止</span>
+              </button>
+
+              <span className="px-2 py-1 text-xs bg-blue-900/50 text-blue-300 rounded">
+                调试中
+              </span>
+            </>
+          )}
+
+          {/* Normal toolbar */}
+          {!isDebugging && (
+            <>
+              <button
+                onClick={handleDebugStart}
+                disabled={isRunning}
+                className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                title="F5: 开始调试"
+              >
+                <span>🔍</span>
+                <span>调试</span>
+              </button>
+
+              <button
+                onClick={handleRun}
+                disabled={isRunning}
+                className="flex items-center gap-1 px-4 py-1.5 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                title="Ctrl+Enter: 运行"
+              >
+                <span>▶</span>
+                <span>运行</span>
+              </button>
+
+              <button
+                onClick={handleInterrupt}
+                disabled={!isRunning}
+                className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+                title="Ctrl+C (运行时)"
+              >
+                <span>⏹</span>
+                <span>终止</span>
+              </button>
+
+              {result && (
+                <button
+                  onClick={handleClearOutput}
+                  className="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
+                  title="清除输出"
+                >
+                  <span>🗑</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </header>
@@ -482,7 +571,7 @@ function App() {
             </div>
           )}
 
-          {/* Debug Variables (Phase 3+) */}
+          {/* Debug Variables */}
           {debugState && debugState.variables && debugState.variables.length > 0 && (
             <div className="px-3 py-2 border-b border-gray-700">
               <h3 className="text-sm font-semibold text-gray-300 mb-2">
@@ -497,6 +586,28 @@ function App() {
                     <span className="text-blue-300">{v.name}</span>
                     <span className="text-gray-400"> = </span>
                     <span className="text-green-300">{String(v.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Call Stack */}
+          {debugState && debugState.callStack && debugState.callStack.length > 0 && (
+            <div className="px-3 py-2 border-b border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-300 mb-2">
+                调用栈
+              </h3>
+              <div className="space-y-1">
+                {debugState.callStack.map((f, i) => (
+                  <div
+                    key={i}
+                    className="text-xs text-gray-300 bg-gray-700/50 px-2 py-1 rounded"
+                  >
+                    <span className="text-yellow-300">{f.functionName}</span>
+                    <span className="text-gray-400"> · 第 </span>
+                    <span className="text-green-300">{f.line}</span>
+                    <span className="text-gray-400"> 行</span>
                   </div>
                 ))}
               </div>
