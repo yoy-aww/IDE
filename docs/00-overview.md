@@ -44,10 +44,10 @@ C++ 是静态强类型语言，浏览器里跑它需要：
 
 ```
 Phase 0  脚手架       1-2天    ✅ 已完成
-Phase 1  解释器核心    2-3周    ⬜ JSCPP 扩展 + Worker 通信
-Phase 2  编辑器集成    1-2周    ⬜ 错误定位 + 断点 + 终端
-Phase 3  调试器        2-3周    ⬜ 步进/变量监视/调用栈
-Phase 4  自研解释器    4-6周    ⬜ 词法/语法/执行引擎
+Phase 1  解释器核心    2-3周    ✅ 已完成
+Phase 2  编辑器集成    1-2周    ✅ 已完成
+Phase 3  调试器        2-3周    ✅ 核心完成（步进/变量监视/调用栈）
+Phase 4  自研解释器    4-6周    ✅ 核心完成（词法/语法/执行引擎）
 Phase 5  打磨         2-3周    ⬜ 教学辅助 + 测试 + 性能
 ```
 
@@ -134,13 +134,16 @@ WASM（如 Emscripten 编译）性能更好，但：
 
 ```
 Phase 0  脚手架       ✅ 已完成  2026-09-26
-Phase 1  解释器核心    ⬜ 待开始
-Phase 2  编辑器集成    ⬜ 待开始
-Phase 3  调试器        ⬜ 待开始
-Phase 4  自研解释器    ⬜ 待开始
+Phase 1  解释器核心    ✅ 已完成  2026-09-26
+Phase 2  编辑器集成    ✅ 已完成  2026-09-26
+Phase 3  调试器        ✅ 核心完成 2026-09-26
+Phase 4  自研解释器    ✅ 核心完成 2026-09-26
 Phase 5  打磨         ⬜ 待开始
 ```
 
 ## 后续文档
 
 - [Phase 0: 项目脚手架](01-phase-0-scaffold.md) — 基础搭建，JSCPP 最短链路
+- [Phase 1: 解释器核心](02-phase-1-interpreter-core.md) — JSCPP 集成 + Worker 沙箱
+- [Phase 2: 编辑器集成](03-phase-2-editor-integration.md) — Monaco 本地化 + 状态栏
+- [Phase 4: 自研解释器](04-phase-4-custom-interpreter.md) — Lexer/Parser/Evaluator
