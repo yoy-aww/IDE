@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Breakpoint marker in glyph margin */
+.breakpoint-marker {
+  background: #ff4757 !important;
+  border-radius: 50%;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 3px !important;
+  cursor: pointer;
+}
+
+/* Error marker in glyph margin */
+.error-marker {
+  background: #ff4757 !important;
+  border-radius: 50%;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 3px !important;
+}
+
+/* Debug arrow marker */
+.debug-arrow {
+  background: transparent !important;
+  position: relative;
+}
+
+/* Current debug line highlight */
+.debug-current-line {
+  background: rgba(0, 122, 255, 0.2) !important;
+  border-left: 2px solid #007aff !important;
+}
+
+/* Error line highlight */
+.error-line {
+  background: rgba(255, 71, 87, 0.15) !important;
+  border-left: 2px solid #ff4757 !important;
+}
+
+/* Terminal styling */
+.terminal {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #1e1e1e;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+/* Monaco editor overrides */
+.monarch-cpp {
+  font-size: 14px;
+}
