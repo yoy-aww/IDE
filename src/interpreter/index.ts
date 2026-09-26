@@ -14,6 +14,29 @@ export interface RunResult {
   errorMessage?: string
 }
 
+/**
+ * 将技术性错误消息转换为少儿友好的提示
+ */
+function friendlyError(msg: string): string {
+  // 语法错误
+  if (msg.includes('意外的 token')) {
+    return `语法错误：这里有个符号放错位置了。${msg}`
+  }
+  if (msg.includes('期望')) {
+    return `语法错误：这里应该写一个特定的符号。${msg}`
+  }
+  // 超时
+  if (msg.includes('超时')) {
+    return '⏰ 程序执行时间太长啦！检查一下是不是写了无限循环。'
+  }
+  // 未定义函数
+  if (msg.includes('未定义的函数')) {
+    return `这个函数还没有定义哦。${msg}`
+  }
+  // 默认：原样返回
+  return msg
+}
+
 export function run(
   code: string,
   stdin: string,
@@ -48,7 +71,7 @@ export function run(
       exitCode: -1,
       errorLine,
       errorCol,
-      errorMessage: msg,
+      errorMessage: friendlyError(msg),
     }
   }
 }
