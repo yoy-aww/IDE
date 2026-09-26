@@ -146,4 +146,5 @@ Phase 5  打磨         ⬜ 待开始
 - [Phase 0: 项目脚手架](01-phase-0-scaffold.md) — 基础搭建，JSCPP 最短链路
 - [Phase 1: 解释器核心](02-phase-1-interpreter-core.md) — JSCPP 集成 + Worker 沙箱
 - [Phase 2: 编辑器集成](03-phase-2-editor-integration.md) — Monaco 本地化 + 状态栏
+- [Phase 3: 调试器](05-phase-3-debugger.md) — 步进调试、断点、变量监视、调用栈
 - [Phase 4: 自研解释器](04-phase-4-custom-interpreter.md) — Lexer/Parser/Evaluator
