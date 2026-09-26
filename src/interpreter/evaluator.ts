@@ -8,6 +8,7 @@ import type {
   CallExprNode, MemberExprNode, IndexExprNode, TernaryExprNode, AssignExprNode,
   NumberLiteralNode, FloatLiteralNode, CharLiteralNode, StringLiteralNode,
   BoolLiteralNode, IdentifierNode, ParamDeclNode, ArrayInitExprNode,
+  CStyleCastNode,
 } from './parser'
 
 // ─── 值类型 ────────────────────────────────────────────────────────────
@@ -222,7 +223,6 @@ export class Interpreter {
   private functions: Map<string, FunctionInfo> = new Map()
   private stdinBuffer: string[] = []
   private breakpoints: Set<number> = new Set()
-  private isPaused: boolean = false
   private currentLine: number = 0
   private debugMode: boolean = false
   private callStack: CallFrame[] = []
@@ -256,7 +256,6 @@ export class Interpreter {
     this.startTime = Date.now()
     for (const decl of program.declarations) {
       this.checkTimeout()
-      this.checkBreakpoint(decl.line)
       this.execute(decl)
     }
 
@@ -426,7 +425,6 @@ export class Interpreter {
 
   setDebugMode(enabled: boolean): void {
     this.debugMode = enabled
-    this.isPaused = false
   }
 
   setBreakpoints(bps: number[]): void {
@@ -449,13 +447,6 @@ export class Interpreter {
     if (this.isTimeout()) {
       this.stderr += '执行超时\n'
       throw new Error('执行超时')
-    }
-  }
-
-  private checkBreakpoint(line: number): void {
-    if (this.breakpoints.has(line)) {
-      this.isPaused = true
-      this.currentLine = line
     }
   }
 
@@ -838,7 +829,7 @@ export class Interpreter {
       case 'AssignExpr':
         return this.evalAssign(node as AssignExprNode)
       case 'CStyleCast': {
-        const cast = node as { type: string; castType: string; operand: ASTNode; line: number; col: number }
+        const cast = node as CStyleCastNode
         const val = this.eval(cast.operand)
         switch (cast.castType) {
           case 'int':

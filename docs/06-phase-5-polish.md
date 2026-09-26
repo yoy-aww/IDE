@@ -231,6 +231,18 @@ tests/interpreter.test.ts    +120 行  9 个新测试用例
 
 ```
 ✓ 30/30 tests passed
-✓ tsc --noEmit 无错误
-✓ vite build 成功
+✓ tsc -b 无错误
+✓ vite build（tsc 阶段通过，vite 阶段受环境内存限制 OOM）
 ```
+
+### 构建修复记录（2026-09-26）
+
+初始状态存在 2 个 TypeScript 编译错误，阻塞 `npm run build`：
+
+1. **parser.ts:797** — `CStyleCast` AST 节点类型未在 `ASTNode` 联合类型中定义，`as ASTNode` 强制转换失败
+2. **evaluator.ts:840** — `case 'CStyleCast'` 分支的 `node` 类型不包含 `CStyleCast`，无法匹配
+
+修复内容：
+- parser.ts: 新增 `CStyleCastNode` 接口并加入 `ASTNode` 联合类型，移除 `as ASTNode` 强制转换
+- evaluator.ts: 导入 `CStyleCastNode` 类型，用类型化转换替换内联结构体定义
+- evaluator.ts: 移除 `checkBreakpoint()` 死代码（该方法设置 `isPaused` 但不抛异常，而 `execute()` 已通过内联断点检查处理调试暂停），同步清理 `isPaused` 字段

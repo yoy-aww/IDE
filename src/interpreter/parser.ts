@@ -176,6 +176,12 @@ export interface IdentifierNode extends BaseNode {
   name: string
 }
 
+export interface CStyleCastNode extends BaseNode {
+  type: 'CStyleCast'
+  castType: string
+  operand: ASTNode
+}
+
 export type ASTNode =
   | ProgramNode
   | FunctionDeclNode
@@ -204,6 +210,7 @@ export type ASTNode =
   | StringLiteralNode
   | BoolLiteralNode
   | IdentifierNode
+  | CStyleCastNode
 
 // ─── 语法分析器 ───────────────────────────────────────────────────────
 
@@ -794,7 +801,7 @@ export class Parser {
           if (this.check('Punctuation', ')')) {
             this.advance()  // consume ')'
             const operand = this.parseUnary()
-            return { type: 'CStyleCast', line: paren.line, col: paren.col, castType: typeName, operand } as ASTNode
+            return { type: 'CStyleCast', line: paren.line, col: paren.col, castType: typeName, operand }
           }
         }
       }
