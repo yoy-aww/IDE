@@ -349,4 +349,123 @@ int main() {
       expect(result.stdout.trim()).toBe('1 2 3 4 5')
     })
   })
+
+  describe('边界与错误', () => {
+    it('除以零报错', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    int a = 10;
+    int b = 0;
+    cout << (a / b) << endl;
+    return 0;
+}
+`, '')
+      expect(result.exitCode).toBe(-1)
+      expect(result.errorMessage).toContain('不能除以 0')
+    })
+
+    it('取模除以零报错', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    int a = 10;
+    int b = 0;
+    cout << (a % b) << endl;
+    return 0;
+}
+`, '')
+      expect(result.exitCode).toBe(-1)
+      expect(result.errorMessage).toContain('不能除以 0')
+    })
+
+    it('数组越界访问', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    int arr[3] = {10, 20, 30};
+    cout << arr[5] << endl;
+    return 0;
+}
+`, '')
+      // 越界返回 0，不崩溃
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.trim()).toBe('0')
+    })
+
+    it('空代码', () => {
+      const result = run('', '')
+      expect(result.exitCode).toBe(0)
+    })
+
+    it('只有 return 0', () => {
+      const result = run(`
+int main() {
+    return 0;
+}
+`, '')
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toBe('')
+    })
+
+    it('多行输出', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    cout << "第一行" << endl;
+    cout << "第二行" << endl;
+    cout << "第三行" << endl;
+    return 0;
+}
+`, '')
+      expect(result.stdout).toContain('第一行')
+      expect(result.stdout).toContain('第二行')
+      expect(result.stdout).toContain('第三行')
+    })
+  })
+
+  describe('字符串与字符', () => {
+    it('字符串输出', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    cout << "Hello " << "World" << endl;
+    return 0;
+}
+`, '')
+      expect(result.stdout).toContain('Hello World')
+    })
+
+    it('字符输出', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    char c = 'A';
+    cout << c << endl;
+    return 0;
+}
+`, '')
+      expect(result.stdout).toContain('A')
+    })
+
+    it('字符转数字', () => {
+      const result = run(`
+#include <iostream>
+using namespace std;
+int main() {
+    char c = 'A';
+    int n = (int)c;
+    cout << "A的ASCII: " << n << endl;
+    return 0;
+}
+`, '')
+      expect(result.stdout).toContain('65')
+    })
+  })
 })
