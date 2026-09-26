@@ -266,6 +266,170 @@ int main() {
 }`,
     stdin: '3 5',
   },
+  {
+    name: '斐波那契数列',
+    code: `#include <iostream>
+using namespace std;
+
+// 递归实现斐波那契数列
+int fibonacci(int n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+int main() {
+    cout << "斐波那契数列:" << endl;
+    for (int i = 0; i <= 10; i++) {
+        cout << fibonacci(i) << " ";
+    }
+    cout << endl;
+    return 0;
+}`,
+  },
+  {
+    name: '猜数字游戏',
+    code: `#include <iostream>
+using namespace std;
+
+int main() {
+    // 简单猜数字：固定答案为 7
+    int answer = 7;
+    int guess = 0;
+    int attempts = 0;
+
+    cout << "猜数字游戏! 我想了个 1-20 之间的数" << endl;
+
+    while (guess != answer) {
+        attempts++;
+        cin >> guess;
+        if (guess < answer) {
+            cout << "太小了! 再试一次" << endl;
+        } else if (guess > answer) {
+            cout << "太大了! 再试一次" << endl;
+        }
+    }
+
+    cout << "恭喜你! 猜对了!" << endl;
+    cout << "一共猜了 " << attempts << " 次" << endl;
+    return 0;
+}`,
+    stdin: '1 15 7',
+  },
+  {
+    name: '闰年判断',
+    code: `#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "判断哪些年份是闰年:" << endl;
+
+    for (int year = 1900; year <= 2100; year += 100) {
+        // 闰年规则：能被4整除但不能被100整除，或者能被400整除
+        if ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)) {
+            cout << year << " 是闰年" << endl;
+        } else {
+            cout << year << " 不是闰年" << endl;
+        }
+    }
+    return 0;
+}`,
+  },
+  {
+    name: '图形打印',
+    code: `#include <iostream>
+using namespace std;
+
+int main() {
+    // 打印三角形
+    cout << "直角三角形:" << endl;
+    for (int i = 1; i <= 5; i++) {
+        for (int j = 1; j <= i; j++) {
+            cout << "*";
+        }
+        cout << endl;
+    }
+
+    cout << endl << "等腰三角形:" << endl;
+    for (int i = 1; i <= 5; i++) {
+        // 打印空格
+        for (int j = 1; j <= (5 - i); j++) {
+            cout << " ";
+        }
+        // 打印星号
+        for (int k = 1; k <= (2 * i - 1); k++) {
+            cout << "*";
+        }
+        cout << endl;
+    }
+
+    return 0;
+}`,
+  },
+  {
+    name: '数字金字塔',
+    code: `#include <iostream>
+using namespace std;
+
+int main() {
+    int n = 5;
+
+    // 上半部分（金字塔）
+    for (int i = 1; i <= n; i++) {
+        for (int j = 1; j <= (n - i); j++) {
+            cout << "  ";
+        }
+        for (int k = 1; k <= (2 * i - 1); k++) {
+            cout << i << " ";
+        }
+        cout << endl;
+    }
+
+    // 下半部分（倒金字塔）
+    for (int i = n - 1; i >= 1; i--) {
+        for (int j = 1; j <= (n - i); j++) {
+            cout << "  ";
+        }
+        for (int k = 1; k <= (2 * i - 1); k++) {
+            cout << i << " ";
+        }
+        cout << endl;
+    }
+
+    return 0;
+}`,
+  },
+  {
+    name: '简易计算器',
+    code: `#include <iostream>
+using namespace std;
+
+// 加减乘除函数
+double calc(double a, double b, char op) {
+    switch (op) {
+        case '+': return a + b;
+        case '-': return a - b;
+        case '*': return a * b;
+        case '/':
+            if (b == 0) {
+                cout << "错误：不能除以 0!" << endl;
+                return 0;
+            }
+            return a / b;
+    }
+    return 0;
+}
+
+int main() {
+    double a, b;
+    char op;
+
+    cin >> a >> op >> b;
+
+    cout << a << " " << op << " " << b << " = " << calc(a, b, op) << endl;
+    return 0;
+}`,
+    stdin: '8 / 2',
+  },
 ]
 
 // ─── 状态栏组件 ───────────────────────────────────────────────────────
