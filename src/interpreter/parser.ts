@@ -781,6 +781,26 @@ export class Parser {
   }
 
   private parseUnary(): ASTNode {
+    // C 风格强制转换: (int)expr, (double)expr, (char)expr, etc.
+    if (this.check('Punctuation', '(')) {
+      const paren = this.peek()
+      // Look ahead: ( type )
+      const save = this.pos
+      this.advance()  // consume '('
+      if (this.peek().type === 'Keyword') {
+        const typeName = this.peek().value
+        if (['int', 'double', 'float', 'char', 'bool', 'long', 'short', 'unsigned'].includes(typeName)) {
+          this.advance()  // consume type keyword
+          if (this.check('Punctuation', ')')) {
+            this.advance()  // consume ')'
+            const operand = this.parseUnary()
+            return { type: 'CStyleCast', line: paren.line, col: paren.col, castType: typeName, operand } as ASTNode
+          }
+        }
+      }
+      this.pos = save  // restore
+    }
+
     if (this.check('Operator', '!') || this.check('Operator', '~') || this.check('Operator', '-') || this.check('Operator', '+')) {
       const op = this.advance()
       const operand = this.parseUnary()

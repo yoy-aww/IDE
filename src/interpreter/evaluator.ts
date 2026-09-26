@@ -19,6 +19,7 @@ export type CppValue =
   | null
   | CppArray
   | CppMap
+  | CppChar
 
 export interface CppArray {
   type: 'array'
@@ -28,6 +29,11 @@ export interface CppArray {
 export interface CppMap {
   type: 'map'
   data: Map<string, CppValue>
+}
+
+export interface CppChar {
+  type: 'char'
+  value: number  // ASCII code
 }
 
 export interface VariableInfo {
@@ -84,7 +90,7 @@ function setVariable(scope: Scope, name: string, value: CppValue): void {
   scope.variables.set(name, value)
 }
 
-function isCppObject(v: CppValue): v is CppArray | CppMap {
+function isCppObject(v: CppValue): v is CppArray | CppMap | CppChar {
   return v !== null && typeof v !== 'string' && typeof v !== 'number' && typeof v !== 'boolean'
 }
 
@@ -154,7 +160,22 @@ function isTruthy(value: CppValue): boolean {
   if (typeof value === 'number') return value !== 0
   if (typeof value === 'boolean') return value
   if (typeof value === 'string') return value.length > 0
+  if (isCppObject(value) && value.type === 'char') return (value as CppChar).value !== 0
   return true
+}
+
+/** 运行时安全检查：除以零 */
+function safeDiv(a: CppValue, b: CppValue): number {
+  const bv = b as number
+  if (bv === 0) throw new Error(`算术错误：不能除以 0。除数 "${String(bv)}" 为 0。`)
+  return (a as number) / bv
+}
+
+/** 运行时安全检查：取模除零 */
+function safeMod(a: CppValue, b: CppValue): number {
+  const bv = b as number
+  if (bv === 0) throw new Error(`算术错误：取模运算不能除以 0。`)
+  return (a as number) % bv
 }
 
 function valuesEqual(a: CppValue, b: CppValue): boolean {
@@ -162,6 +183,9 @@ function valuesEqual(a: CppValue, b: CppValue): boolean {
   if (typeof a === 'string' && typeof b === 'string') return a === b
   if (typeof a === 'boolean' && typeof b === 'boolean') return a === b
   if (a === null && b === null) return true
+  if (isCppObject(a) && a.type === 'char' && typeof b === 'number') return (a as CppChar).value === b
+  if (isCppObject(b) && b.type === 'char' && typeof a === 'number') return (b as CppChar).value === a
+  if (isCppObject(a) && isCppObject(b) && a.type === 'char' && b.type === 'char') return (a as CppChar).value === (b as CppChar).value
   return false
 }
 
@@ -173,7 +197,8 @@ function formatValue(value: CppValue): string {
     return String(value)
   }
   if (typeof value === 'string') return value
-  if (value.type === 'array') return String((value as CppArray).data)
+  if (isCppObject(value) && value.type === 'array') return String((value as CppArray).data)
+  if (isCppObject(value) && value.type === 'char') return String.fromCharCode((value as CppChar).value)
   return String(value)
 }
 
@@ -478,15 +503,18 @@ export class Interpreter {
     if (typeof value === 'number') return value
     if (typeof value === 'boolean') return value
     if (typeof value === 'string') return value
-    if (value.type === 'array') {
+    if (isCppObject(value) && value.type === 'array') {
       return (value as CppArray).data.map(v => this.serializeValue(v))
     }
-    if (value.type === 'map') {
+    if (isCppObject(value) && value.type === 'map') {
       const entries: Record<string, unknown> = {}
       for (const [k, v] of (value as CppMap).data) {
         entries[k] = this.serializeValue(v)
       }
       return entries
+    }
+    if (isCppObject(value) && value.type === 'char') {
+      return String.fromCharCode((value as CppChar).value)
     }
     return String(value)
   }
@@ -497,8 +525,9 @@ export class Interpreter {
     if (typeof value === 'number') return Number.isInteger(value) ? 'int' : 'double'
     if (typeof value === 'boolean') return 'bool'
     if (typeof value === 'string') return 'string'
-    if (value.type === 'array') return 'vector'
-    if (value.type === 'map') return 'map'
+    if (isCppObject(value) && value.type === 'array') return 'vector'
+    if (isCppObject(value) && value.type === 'map') return 'map'
+    if (isCppObject(value) && value.type === 'char') return 'char'
     return 'unknown'
   }
 
@@ -768,7 +797,7 @@ export class Interpreter {
       case 'FloatLiteral':
         return (node as FloatLiteralNode).value
       case 'CharLiteral':
-        return (node as CharLiteralNode).value
+        return { type: 'char', value: (node as CharLiteralNode).value }
       case 'StringLiteral':
         return (node as StringLiteralNode).value
       case 'BoolLiteral':
@@ -808,6 +837,24 @@ export class Interpreter {
       }
       case 'AssignExpr':
         return this.evalAssign(node as AssignExprNode)
+      case 'CStyleCast': {
+        const cast = node as { type: string; castType: string; operand: ASTNode; line: number; col: number }
+        const val = this.eval(cast.operand)
+        switch (cast.castType) {
+          case 'int':
+            return typeof val === 'number' ? Math.trunc(val) : (isCppObject(val) && val.type === 'char' ? (val as CppChar).value : 0)
+          case 'double':
+          case 'float':
+            return typeof val === 'number' ? val : (isCppObject(val) && val.type === 'char' ? (val as CppChar).value : 0)
+          case 'char':
+            if (typeof val === 'number') return { type: 'char', value: Math.trunc(val) } as CppChar
+            return val
+          case 'bool':
+            return isTruthy(val)
+          default:
+            return val
+        }
+      }
       default:
         return 0
     }
@@ -835,8 +882,8 @@ export class Interpreter {
         return (left as number) + (right as number)
       case '-': return (left as number) - (right as number)
       case '*': return (left as number) * (right as number)
-      case '/': return (left as number) / (right as number)
-      case '%': return ((left as number) % (right as number))
+      case '/': return safeDiv(left, right)
+      case '%': return safeMod(left, right)
       case '==': return valuesEqual(left, right)
       case '!=': return !valuesEqual(left, right)
       case '<': return (left as number) < (right as number)
