@@ -48,7 +48,7 @@ Phase 1  解释器核心    2-3周    ✅ 已完成
 Phase 2  编辑器集成    1-2周    ✅ 已完成
 Phase 3  调试器        2-3周    ✅ 核心完成（步进/变量监视/调用栈）
 Phase 4  自研解释器    4-6周    ✅ 核心完成（词法/语法/执行引擎）
-Phase 5  打磨         2-3周    ⬜ 教学辅助 + 测试 + 性能
+Phase 5  打磨         2-3周    ✅ 教学辅助 + 测试 + 性能
 ```
 
 ### 为什么先 JSCPP 后自研？
@@ -138,7 +138,7 @@ Phase 1  解释器核心    ✅ 已完成  2026-09-26
 Phase 2  编辑器集成    ✅ 已完成  2026-09-26
 Phase 3  调试器        ✅ 核心完成 2026-09-26
 Phase 4  自研解释器    ✅ 核心完成 2026-09-26
-Phase 5  打磨         ⬜ 待开始
+Phase 5  打磨         ✅ 已完成 2026-09-26
 ```
 
 ## 后续文档
@@ -148,3 +148,4 @@ Phase 5  打磨         ⬜ 待开始
 - [Phase 2: 编辑器集成](03-phase-2-editor-integration.md) — Monaco 本地化 + 状态栏
 - [Phase 3: 调试器](05-phase-3-debugger.md) — 步进调试、断点、变量监视、调用栈
 - [Phase 4: 自研解释器](04-phase-4-custom-interpreter.md) — Lexer/Parser/Evaluator
+- [Phase 5: 打磨](06-phase-5-polish.md) — 友好错误提示、运行时安全、CStyleCast、教学示例、测试覆盖
