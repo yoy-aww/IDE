@@ -40,7 +40,7 @@ export interface VariableInfo {
 export interface DebugSnapshot {
   currentLine: number
   variables: VariableInfo[]
-  callStack: string[]
+  callStack: { functionName: string; line: number }[]
   stdout: string
   paused: boolean
 }
@@ -116,6 +116,35 @@ class ContinueSignal extends Error {
   constructor() { super('continue') }
 }
 
+/** 调试暂停信号：解释器到达断点或目标行时抛出，携带当前状态 */
+export class PauseSignal extends Error {
+  line: number
+  variables: { name: string; value: unknown; type: string; line: number }[]
+  callStack: { functionName: string; line: number }[]
+  stdout: string
+  atBreakpoint: boolean
+
+  constructor(state: {
+    line: number
+    variables: { name: string; value: unknown; type: string; line: number }[]
+    callStack: { functionName: string; line: number }[]
+    stdout: string
+    atBreakpoint: boolean
+  }) {
+    super('pause')
+    this.line = state.line
+    this.variables = state.variables
+    this.callStack = state.callStack
+    this.stdout = state.stdout
+    this.atBreakpoint = state.atBreakpoint
+  }
+}
+
+interface CallFrame {
+  name: string
+  line: number
+}
+
 // ─── 辅助函数 ──────────────────────────────────────────────────────────
 
 const STREAM_MARKER = '___STREAM___'
@@ -171,7 +200,7 @@ export class Interpreter {
   private isPaused: boolean = false
   private currentLine: number = 0
   private debugMode: boolean = false
-  private callStack: string[] = []
+  private callStack: CallFrame[] = []
   private timeoutMs: number = 5000
   private startTime: number = 0
 
@@ -214,10 +243,151 @@ export class Interpreter {
       } catch (e) {
         if (e instanceof ReturnSignal) {
           // main 的 return 值，忽略
+        } else if (e instanceof PauseSignal) {
+          throw e  // 调试暂停信号需要传播到调用者
         } else {
           throw e
         }
       }
+    }
+  }
+
+  /**
+   * 探测执行：运行程序并记录所有执行的行号序列
+   * 用于调试时确定"下一步"的行号
+   */
+  probeLines(program: ProgramNode, stdin: string, skipLines: number[]): number[] {
+    const visited: number[] = []
+    const skipSet = new Set(skipLines)
+
+    // 重置状态
+    this.stdout = ''
+    this.stderr = ''
+    this.breakpoints = new Set()  // 不设置断点，纯粹探测
+    this.currentLine = 0
+    this.callStack = []
+    this.stdinBuffer = stdin.trim().split(/\s+/).filter(s => s.length > 0)
+    this.debugMode = false
+    this.startTime = Date.now()
+
+    // 第一遍：注册函数
+    for (const decl of program.declarations) {
+      if (decl.type === 'FunctionDecl') {
+        this.registerFunction(decl as FunctionDeclNode)
+      }
+    }
+
+    // 第二遍：执行顶层语句
+    for (const decl of program.declarations) {
+      this.probeVisit(decl, visited, skipSet)
+    }
+
+    // 第三遍：执行 main
+    const main = this.functions.get('main')
+    if (main) {
+      try {
+        this.probeVisit(main.body, visited, skipSet)
+      } catch (e) {
+        if (e instanceof ReturnSignal || e instanceof BreakSignal || e instanceof ContinueSignal) {
+          // 正常终止
+        } else {
+          throw e
+        }
+      }
+    }
+
+    return visited
+  }
+
+  /** 递归探测：访问节点的所有子节点，记录行号 */
+  private probeVisit(node: ASTNode, visited: number[], skipSet: Set<number>): void {
+    if (skipSet.has(node.line)) return
+    visited.push(node.line)
+
+    switch (node.type) {
+      case 'BlockStmt': {
+        const block = node as BlockStmtNode
+        for (const stmt of block.statements) {
+          this.probeVisit(stmt, visited, skipSet)
+        }
+        break
+      }
+      case 'IfStmt': {
+        const ifNode = node as IfStmtNode
+        const cond = this.eval(ifNode.condition)
+        if (isTruthy(cond)) {
+          this.probeVisit(ifNode.consequent, visited, skipSet)
+        } else if (ifNode.alternate) {
+          this.probeVisit(ifNode.alternate, visited, skipSet)
+        }
+        break
+      }
+      case 'WhileStmt': {
+        // 最多循环 100 次防止无限循环
+        for (let i = 0; i < 100; i++) {
+          const cond = this.eval((node as WhileStmtNode).condition)
+          if (!isTruthy(cond)) break
+          this.probeVisit((node as WhileStmtNode).body, visited, skipSet)
+        }
+        break
+      }
+      case 'ForStmt': {
+        const forNode = node as ForStmtNode
+        const scope = createScope(this.globalScope)
+        const oldScope = this.globalScope
+        this.globalScope = scope
+        try {
+          if (forNode.init) this.execute(forNode.init)
+          for (let i = 0; i < 100; i++) {
+            if (forNode.condition) {
+              const cond = this.eval(forNode.condition)
+              if (!isTruthy(cond)) break
+            }
+            this.probeVisit(forNode.body, visited, skipSet)
+            if (forNode.update) this.eval(forNode.update)
+          }
+        } finally {
+          this.globalScope = oldScope
+        }
+        break
+      }
+      case 'VarDecl': {
+        this.executeVarDecl(node as VarDeclNode)
+        break
+      }
+      case 'ExprStmt':
+        this.eval((node as ExprStmtNode).expression)
+        break
+      case 'CallExpr':
+        this.evalCall(node as CallExprNode)
+        break
+      case 'FunctionDecl':
+        this.registerFunction(node as FunctionDeclNode)
+        break
+      case 'ReturnStmt': {
+        const rs = node as ReturnStmtNode
+        if (rs.value) this.eval(rs.value)
+        break
+      }
+      case 'SwitchStmt': {
+        const sw = node as SwitchStmtNode
+        const val = this.eval(sw.expression)
+        for (const cs of sw.cases) {
+          if (cs.value) {
+            const caseVal = this.eval(cs.value)
+            if (valuesEqual(val, caseVal)) {
+              for (const stmt of cs.statements) {
+                this.probeVisit(stmt, visited, skipSet)
+              }
+              break
+            }
+          }
+        }
+        break
+      }
+      default:
+        // 叶子节点，不需要递归
+        break
     }
   }
 
@@ -264,6 +434,74 @@ export class Interpreter {
     }
   }
 
+  /** 在调试模式下暂停，捕获当前状态并抛出 PauseSignal */
+  private throwPause(line: number, atBreakpoint: boolean): void {
+    const variables = this.collectVariables()
+    const callStack = this.callStack.map(f => ({ functionName: f.name, line: f.line }))
+    throw new PauseSignal({
+      line,
+      variables,
+      callStack,
+      stdout: this.stdout,
+      atBreakpoint,
+    })
+  }
+
+  /** 收集当前作用域链上的所有变量 */
+  private collectVariables(): { name: string; value: unknown; type: string; line: number }[] {
+    const result: { name: string; value: unknown; type: string; line: number }[] = []
+    let scope: Scope | null = this.globalScope
+    while (scope) {
+      for (const [name, value] of scope.variables) {
+        if (name === 'cout' || name === 'cin' || name === 'endl') continue
+        result.push({
+          name,
+          value: this.serializeValue(value),
+          type: this.inferType(value),
+          line: this.currentLine,
+        })
+      }
+      scope = scope.parent
+    }
+    // 去重（内层优先）
+    const seen = new Set<string>()
+    return result.filter(v => {
+      if (seen.has(v.name)) return false
+      seen.add(v.name)
+      return true
+    })
+  }
+
+  /** 将值序列化为可传输的格式 */
+  private serializeValue(value: CppValue): unknown {
+    if (value === null) return null
+    if (typeof value === 'number') return value
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'string') return value
+    if (value.type === 'array') {
+      return (value as CppArray).data.map(v => this.serializeValue(v))
+    }
+    if (value.type === 'map') {
+      const entries: Record<string, unknown> = {}
+      for (const [k, v] of (value as CppMap).data) {
+        entries[k] = this.serializeValue(v)
+      }
+      return entries
+    }
+    return String(value)
+  }
+
+  /** 推断值类型名称 */
+  private inferType(value: CppValue): string {
+    if (value === null) return 'null'
+    if (typeof value === 'number') return Number.isInteger(value) ? 'int' : 'double'
+    if (typeof value === 'boolean') return 'bool'
+    if (typeof value === 'string') return 'string'
+    if (value.type === 'array') return 'vector'
+    if (value.type === 'map') return 'map'
+    return 'unknown'
+  }
+
   private print(value: CppValue): void {
     this.stdout += formatValue(value)
   }
@@ -273,9 +511,10 @@ export class Interpreter {
   execute(node: ASTNode): void {
     this.checkTimeout()
     this.currentLine = node.line
-    if (this.breakpoints.has(node.line)) {
-      this.isPaused = true
-      return
+
+    // 调试模式：检查断点 → 暂停
+    if (this.debugMode && this.breakpoints.has(node.line)) {
+      this.throwPause(node.line, true)
     }
 
     switch (node.type) {
@@ -296,61 +535,56 @@ export class Interpreter {
         break
       }
 
-      case 'BlockStmt': {
-        this.executeBlock(node as BlockStmtNode)
-        break
-      }
-
-      case 'IfStmt': {
-        this.executeIf(node as IfStmtNode)
-        break
-      }
-
-      case 'WhileStmt': {
-        this.executeWhile(node as WhileStmtNode)
-        break
-      }
-
-      case 'DoWhileStmt': {
-        this.executeDoWhile(node as DoWhileStmtNode)
-        break
-      }
-
-      case 'ForStmt': {
-        this.executeFor(node as ForStmtNode)
-        break
-      }
-
-      case 'SwitchStmt': {
-        this.executeSwitch(node as SwitchStmtNode)
-        break
-      }
-
-      case 'CaseStmt': {
-        break
-      }
-
-      case 'ReturnStmt': {
-        const returnNode = node as ReturnStmtNode
-        let value: CppValue = 0
-        if (returnNode.value) {
-          value = this.eval(returnNode.value)
-        }
-        throw new ReturnSignal(value)
-      }
-
       case 'ExprStmt': {
         const expr = (node as ExprStmtNode).expression
-        // 特殊处理 break/continue 语句
+        // break/continue 检测（parser 不识别它们为语句，而是 Identifier）
         if (expr.type === 'Identifier') {
           const name = (expr as IdentifierNode).name
-          if (name === 'break') throw new BreakSignal()
-          if (name === 'continue') throw new ContinueSignal()
+          if (name === 'break') {
+            throw new BreakSignal()
+          }
+          if (name === 'continue') {
+            throw new ContinueSignal()
+          }
+        }
+        // return 检测
+        if (expr.type === 'Identifier' && (expr as IdentifierNode).name === 'return') {
+          // return 后面可能跟表达式
+          const stmt = node as ExprStmtNode
+          this.eval(stmt.expression)
+          throw new ReturnSignal(0)
         }
         this.eval(expr)
         break
       }
 
+      case 'ReturnStmt': {
+        const rs = node as ReturnStmtNode
+        const val = rs.value ? this.eval(rs.value) : 0
+        throw new ReturnSignal(val)
+      }
+
+      case 'IfStmt':
+        this.executeIf(node as IfStmtNode)
+        break
+      case 'WhileStmt':
+        this.executeWhile(node as WhileStmtNode)
+        break
+      case 'DoWhileStmt':
+        this.executeDoWhile(node as DoWhileStmtNode)
+        break
+      case 'ForStmt':
+        this.executeFor(node as ForStmtNode)
+        break
+      case 'SwitchStmt':
+        this.executeSwitch(node as SwitchStmtNode)
+        break
+      case 'BlockStmt':
+        this.executeBlock(node as BlockStmtNode)
+        break
+      case 'CaseStmt':
+        // case 语句本身不需要单独执行（在 switch 内处理）
+        break
       default:
         this.eval(node)
         break
@@ -680,7 +914,7 @@ export class Interpreter {
     const scope = createScope(this.globalScope)
     const oldScope = this.globalScope
     this.globalScope = scope
-    this.callStack.push(func.name)
+    this.callStack.push({ name: func.name, line: func.line })
 
     try {
       // 绑定参数
